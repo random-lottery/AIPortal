@@ -1,0 +1,21 @@
+@import 'vuetify/styles';
+
+:root {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background-color: #f5f7fb;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.widget-surface {
+  position: relative;
+  min-height: calc(100vh - 80px);
+  overflow: hidden;
+}

@@ -1,0 +1,30 @@
+{
+  "name": "aiportal",
+  "version": "1.0.0",
+  "description": "A full-stack demo portal where users can:",
+  "main": "index.js",
+  "scripts": {
+    "build:functions": "tsc -p tsconfig.json",
+    "dev:functions": "netlify dev",
+    "test": "echo \"No tests configured\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@netlify/functions": "^5.1.2",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.2.3",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.18.0",
+    "reflect-metadata": "^0.2.2",
+    "typeorm": "^0.3.28"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.2.0",
+    "typescript": "^5.9.3"
+  }
+}

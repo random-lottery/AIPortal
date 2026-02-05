@@ -1,0 +1,800 @@
+AI Agent Portal 开发技术文档
+1. 概述
+1.1. 目的
+本文档旨在提供构建 AI Agent Portal 的技术指导，该门户将作为一个统一的平台，允许用户管理其个性化设置、通过 AI 代理操作门户配置，并实时显示自定义内容。
+
+1.2. 核心功能
+用户偏好管理：保存和加载用户的个性化门户设置。
+用户认证与配置修改：提供用户登录功能，并允许用户安全地修改其门户设置。
+AI 代理操作：集成 AI 代理，使用户能够通过自然语言指令或自动化逻辑来操作和调整门户配置。
+灵活的窗口管理：门户内的组件（窗口）支持最小化、最大化、全屏和自由拖拽、缩放。
+实时自定义内容显示：用户可以配置在门户中显示各种实时数据和自定义内容。
+1.3. 技术栈概览
+我们将采用以下主流且最新的技术栈：
+
+前端: Vue.js 3 (Composition API, <script setup>), Vuetify v3, Pinia, Axios, Socket.IO Client.
+后端: Node.js (Express.js), TypeScript, MongoDB, JWT, Socket.IO Server.
+AI 集成: RESTful API 调用，可能涉及 LangChain.js 或直接调用 OpenAI/其他大模型 API。
+2. 前端架构
+前端负责用户界面的渲染、用户交互、数据展示和与后端 API 的通信。
+
+2.1. 框架与库
+JavaScript 框架: Vue.js 3。选择 Vue 3 是因为它提供了高性能、易学易用、强大的组合式 API (Composition API) 以及 <script setup> 语法糖，极大地提升了开发效率和代码可维护性。
+UI 组件库: Vuetify v3。Vuetify 是一个基于 Vue 的 Material Design 组件框架，提供了丰富的预构建 UI 组件，特别适合快速构建美观且响应式的界面。其组件生态系统能帮助我们实现复杂的布局和样式，例如卡片、导航、按钮等。对于窗口管理，Vuetify 提供了 v-card 和 v-overlay 等基础组件，我们可以在此基础上构建拖拽、缩放、最小化/最大化功能。
+状态管理: Pinia。作为 Vue 3 官方推荐的状态管理库，Pinia 轻量、类型安全且易于使用，能有效管理跨组件共享的应用状态，如用户认证状态、门户配置数据等。
+路由: Vue Router 4。用于实现单页应用的页面导航和管理。
+HTTP 客户端: Axios。一个基于 Promise 的 HTTP 客户端，用于与后端 API 进行数据交互，提供更好的错误处理和请求拦截功能。
+实时通信: Socket.IO Client。用于建立 WebSockets 连接，实现客户端与服务器之间的实时双向通信，以支持实时内容更新。
+2.2. 前端结构示例 (Vue 3 with <script setup>)
+TypeScript
+
+
+// interfaces/portal.ts
+export interface PortalWidget {
+  id: string;
+  type: 'text' | 'chart' | 'weather' | 'custom';
+  title: string;
+  position: { x: number; y: number; width: number; height: number; zIndex: number };
+  minimized: boolean;
+  maximized: boolean;
+  fullscreen: boolean;
+  config: Record<string, any>; // Dynamic configuration for the widget
+}
+
+export interface UserPortalSettings {
+  userId: string;
+  layout: PortalWidget[];
+  theme: string;
+  language: string;
+  // Other user-specific preferences
+}
+
+// store/auth.ts
+import { defineStore } from 'pinia';
+import { ref } from 'vue';
+
+export const useAuthStore = defineStore('auth', () => {
+  const isAuthenticated = ref<boolean>(false);
+  const user = ref<string | null>(null); // Ideally, a more detailed user object
+
+  const login = async (token: string, userData: string): Promise<void> => {
+    localStorage.setItem('authToken', token);
+    user.value = userData;
+    isAuthenticated.value = true;
+  };
+
+  const logout = (): void => {
+    localStorage.removeItem('authToken');
+    user.value = null;
+    isAuthenticated.value = false;
+  };
+
+  return { isAuthenticated, user, login, logout };
+});
+
+// views/Dashboard.vue (Example of a core portal component)
+<template>
+  <v-app>
+    <v-app-bar app>
+      <v-app-bar-nav-icon></v-app-bar-nav-icon>
+      <v-toolbar-title>AI Agent Portal</v-toolbar-title>
+      <v-spacer></v-spacer>
+      <v-btn icon @click="toggleSettingsPanel">
+        <v-icon>mdi-cog</v-icon>
+      </v-btn>
+      <v-btn v-if="authStore.isAuthenticated" @click="authStore.logout()">Logout</v-btn>
+    </v-app-bar>
+
+    <v-main>
+      <v-container fluid class="fill-height">
+        <!-- Render widgets based on user settings -->
+        <PortalWidgetComponent
+          v-for="widget in userSettings.layout"
+          :key="widget.id"
+          :widget="widget"
+          @update-position="updateWidgetPosition"
+          @minimize="minimizeWidget"
+          @maximize="maximizeWidget"
+          @fullscreen="fullscreenWidget"
+        />
+        <v-overlay v-model="settingsPanelVisible" persistent class="align-center justify-center">
+          <v-card class="pa-4" width="500">
+            <v-card-title>Portal Settings</v-card-title>
+            <v-card-text>
+              <!-- Settings forms here -->
+              <v-switch v-model="darkMode" label="Dark Mode"></v-switch>
+            </v-card-text>
+            <v-card-actions>
+              <v-spacer></v-spacer>
+              <v-btn color="primary" @click="saveSettings">Save</v-btn>
+              <v-btn @click="settingsPanelVisible = false">Close</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-overlay>
+      </v-container>
+    </v-main>
+  </v-app>
+</template>
+
+<script lang="ts" setup>
+import { ref, onMounted, watch } from 'vue';
+import { useAuthStore } from '@/store/auth';
+import type { PortalWidget, UserPortalSettings } from '@/interfaces/portal';
+import PortalWidgetComponent from '@/components/PortalWidgetComponent.vue'; // Custom component for individual widgets
+// Import other necessary modules like Socket.IO client, Axios etc.
+
+const authStore = useAuthStore();
+const settingsPanelVisible = ref<boolean>(false);
+const darkMode = ref<boolean>(false); // Example setting
+
+const userSettings = ref<UserPortalSettings>({
+  userId: authStore.user || '',
+  layout: [], // Initialize with empty layout
+  theme: 'light',
+  language: 'en',
+});
+
+// Load user settings on mount
+onMounted(async () => {
+  if (authStore.isAuthenticated) {
+    await fetchUserSettings();
+  }
+});
+
+watch(() => authStore.isAuthenticated, async (newVal: boolean) => {
+  if (newVal && !userSettings.value.layout.length) {
+    await fetchUserSettings();
+  }
+});
+
+const fetchUserSettings = async (): Promise<void> => {
+  try {
+    // Replace with actual API call
+    const response = await fetch('/api/user/settings'); // Example using fetch, use axios in real app
+    if (response.ok) {
+      const data = await response.json() as UserPortalSettings;
+      userSettings.value = data;
+      darkMode.value = data.theme === 'dark';
+    } else {
+      console.error('Failed to fetch user settings');
+      // Handle error, e.g., load default settings
+      userSettings.value.layout = getDefaultWidgets();
+    }
+  } catch (error: any) {
+    console.error('Error fetching user settings:', error);
+    // Handle network errors
+    userSettings.value.layout = getDefaultWidgets();
+  }
+};
+
+const saveSettings = async (): Promise<void> => {
+  try {
+    userSettings.value.theme = darkMode.value ? 'dark' : 'light';
+    // Replace with actual API call
+    const response = await fetch('/api/user/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userSettings.value),
+    });
+    if (response.ok) {
+      console.log('Settings saved successfully');
+      settingsPanelVisible.value = false;
+    } else {
+      console.error('Failed to save settings');
+    }
+  } catch (error: any) {
+    console.error('Error saving settings:', error);
+  }
+};
+
+const toggleSettingsPanel = (): void => {
+  settingsPanelVisible.value = !settingsPanelVisible.value;
+};
+
+// Widget specific actions (simplified)
+const updateWidgetPosition = (widgetId: string, newPosition: PortalWidget['position']): void => {
+  const widget = userSettings.value.layout.find(w => w.id === widgetId);
+  if (widget) {
+    widget.position = newPosition;
+    // Potentially debounce saving to backend
+  }
+};
+
+const minimizeWidget = (widgetId: string): void => {
+  const widget = userSettings.value.layout.find(w => w.id === widgetId);
+  if (widget) {
+    widget.minimized = true;
+    widget.maximized = false;
+    widget.fullscreen = false;
+  }
+};
+
+const maximizeWidget = (widgetId: string): void => {
+  const widget = userSettings.value.layout.find(w => w.id === widgetId);
+  if (widget) {
+    widget.maximized = true;
+    widget.minimized = false;
+    widget.fullscreen = false;
+  }
+};
+
+const fullscreenWidget = (widgetId: string): void => {
+  const widget = userSettings.value.layout.find(w => w.id === widgetId);
+  if (widget) {
+    widget.fullscreen = true;
+    widget.maximized = false;
+    widget.minimized = false;
+  }
+};
+
+// Example of default widgets
+const getDefaultWidgets = (): PortalWidget[] => {
+  return [
+    { id: 'widget-1', type: 'text', title: 'Welcome', position: { x: 10, y: 10, width: 300, height: 200, zIndex: 1 }, minimized: false, maximized: false, fullscreen: false, config: { content: 'Hello, AI Agent Portal!' } },
+    { id: 'widget-2', type: 'chart', title: 'Data Trends', position: { x: 320, y: 10, width: 400, height: 250, zIndex: 2 }, minimized: false, maximized: false, fullscreen: false, config: { chartType: 'line', dataUrl: '/api/data/trends' } },
+  ];
+};
+
+// Real-time content updates via Socket.IO
+// import { io, Socket } from 'socket.io-client';
+// const socket: Socket = io('http://localhost:3000'); // Connect to your Socket.IO server
+// onMounted(() => {
+//   socket.on('realtime-update', (data: { widgetId: string; content: any }) => {
+//     const widget = userSettings.value.layout.find(w => w.id === data.widgetId);
+//     if (widget && widget.type === 'custom') { // Example for custom widget
+//       widget.config.realtimeData = data.content;
+//     }
+//   });
+// });
+// onBeforeUnmount(() => {
+//   socket.disconnect();
+// });
+</script>
+
+<style scoped>
+/* Custom styles for layout and widget positioning */
+.fill-height {
+  position: relative; /* Needed for absolute positioning of widgets */
+  overflow: hidden; /* Prevent scrollbar from layout elements */
+}
+</style>
+
+2.3. 窗口管理实现思路
+窗口管理（拖拽、缩放、最小化、最大化、全屏）是 Portal 的核心交互特性。Vuetify 本身不直接提供完整的桌面级窗口管理功能，但我们可以结合以下策略实现：
+
+基础容器: 使用 v-card 作为每个窗口的基础视觉容器。
+拖拽: 使用 v-draggable 或手动实现。手动实现通常涉及监听 mousedown、mousemove、mouseup 事件，结合 CSS transform: translate() 来改变窗口位置。
+缩放: 类似于拖拽，通过监听窗口边缘或角落的 mousedown 事件，在 mousemove 时调整窗口的 width 和 height 样式。
+最小化/最大化/全屏:
+最小化: 将窗口移动到屏幕底部或侧边的“任务栏”区域，并隐藏其内容，只显示标题。
+最大化: 将窗口的 width 和 height 设置为父容器（或视口）的 100%，并将其 top 和 left 设置为 0。
+全屏: 激活浏览器原生的全屏 API (element.requestFullscreen())，或者同样将窗口宽高设置为视口 100%，并置于顶层 (z-index)。
+Z-index 管理: 当用户点击某个窗口时，提升其 z-index 值，使其显示在其他窗口之上。
+状态持久化: 窗口的位置、大小、最小化/最大化/全屏状态应作为用户偏好的一部分存储在后端，并在下次登录时恢复。
+考虑使用现有的 Vue 3 兼容的第三方库来简化实现，例如 vue-slicksort (用于拖拽排序，可能需要改造) 或更专业的窗口管理库 (如果存在且符合需求)。
+
+3. 后端架构
+后端负责用户认证、数据存储、AI 代理逻辑、实时数据处理和 API 服务。
+
+3.1. 框架与库
+Node.js 运行时: 基于事件驱动、非阻塞 I/O 的特性，非常适合构建高性能的 API 服务。
+Web 框架: Express.js。灵活、轻量级的 Node.js Web 应用框架，便于构建 RESTful API。
+TypeScript: 提供静态类型检查，增强代码质量和可维护性。
+数据库: MongoDB。一个 NoSQL 数据库，特别适合存储半结构化或无模式数据，如用户个性化偏好、动态的门户配置和 AI 代理的会话历史。它的文档模型与前端配置对象的结构非常契合，易于存储和检索。
+身份验证: JSON Web Tokens (JWT)。用于实现无状态的用户认证机制。用户登录成功后，服务器颁发 JWT，客户端将其存储并在后续请求中携带，服务器验证 JWT 以确认用户身份。
+密码加密: bcrypt.js。用于安全地存储用户密码哈希。
+实时通信: Socket.IO Server。与前端 Socket.IO Client 配合，建立稳定高效的 WebSockets 连接，用于推送实时内容更新到客户端。
+AI 代理集成: LangChain.js 或直接调用 OpenAI API/其他大模型 API。
+LangChain.js 提供了一个框架，用于开发由语言模型驱动的应用程序，可以帮助我们构建复杂的 AI Agent 逻辑，如链式调用、记忆管理、工具使用等。
+3.2. 后端结构示例 (Express.js with TypeScript)
+TypeScript
+
+
+// interfaces/user.ts
+export interface User {
+  _id?: string;
+  username: string;
+  email: string;
+  password?: string; // Stored as hash
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// interfaces/portal.ts (Shared with frontend)
+export interface PortalWidget {
+  id: string;
+  type: 'text' | 'chart' | 'weather' | 'custom';
+  title: string;
+  position: { x: number; y: number; width: number; height: number; zIndex: number };
+  minimized: boolean;
+  maximized: boolean;
+  fullscreen: boolean;
+  config: Record<string, any>;
+}
+
+export interface UserPortalSettings {
+  userId: string; // References User._id
+  layout: PortalWidget[];
+  theme: string;
+  language: string;
+  // Other user-specific preferences
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// models/User.ts
+import mongoose, { Document, Schema } from 'mongoose';
+import bcrypt from 'bcryptjs';
+import type { User } from '../interfaces/user';
+
+export interface UserDocument extends User, Document {}
+
+const UserSchema: Schema = new Schema({
+  username: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+// Pre-save hook to hash password
+UserSchema.pre<UserDocument>('save', async function (next) {
+  if (this.isModified('password')) {
+    this.password = await bcrypt.hash(this.password as string, 10);
+  }
+  next();
+});
+
+// Method to compare password
+UserSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
+  return await bcrypt.compare(candidatePassword, this.password as string);
+};
+
+export const UserModel = mongoose.model<UserDocument>('User', UserSchema);
+
+
+// models/PortalSetting.ts
+import mongoose, { Document, Schema } from 'mongoose';
+import type { UserPortalSettings } from '../interfaces/portal';
+
+export interface PortalSettingDocument extends UserPortalSettings, Document {}
+
+const PortalSettingSchema: Schema = new Schema({
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+  layout: [{
+    id: { type: String, required: true },
+    type: { type: String, required: true },
+    title: { type: String, required: true },
+    position: {
+      x: { type: Number, required: true },
+      y: { type: Number, required: true },
+      width: { type: Number, required: true },
+      height: { type: Number, required: true },
+      zIndex: { type: Number, required: true },
+    },
+    minimized: { type: Boolean, default: false },
+    maximized: { type: Boolean, default: false },
+    fullscreen: { type: Boolean, default: false },
+    config: { type: Schema.Types.Mixed, default: {} }, // Use Mixed for flexible configuration
+  }],
+  theme: { type: String, default: 'light' },
+  language: { type: String, default: 'en' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+export const PortalSettingModel = mongoose.model<PortalSettingDocument>('PortalSetting', PortalSettingSchema);
+
+// middleware/auth.ts (JWT authentication middleware)
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+
+interface AuthenticatedRequest extends Request {
+  userId?: string;
+}
+
+export const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  const authHeader: string | undefined = req.headers['authorization'];
+  const token: string | undefined = authHeader && authHeader.split(' ')[1];
+
+  if (token == null) {
+    res.sendStatus(401); // Unauthorized
+    return;
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET as string, (err: jwt.VerifyErrors | null, user: object | undefined) => {
+    if (err) {
+      res.sendStatus(403); // Forbidden
+      return;
+    }
+    req.userId = (user as { userId: string }).userId; // Attach user ID to request
+    next();
+  });
+};
+
+// routes/auth.ts
+import { Router, Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { UserModel } from '../models/User';
+import type { User } from '../interfaces/user';
+
+const authRouter = Router();
+
+// Register a new user
+authRouter.post('/register', async (req: Request, res: Response) => {
+  try {
+    const { username, email, password } = req.body as User;
+    // Input validation
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    const existingUser = await UserModel.findOne({ $or: [{ username }, { email }] });
+    if (existingUser) {
+      return res.status(409).json({ message: 'Username or email already exists' });
+    }
+
+    const newUser = new UserModel({ username, email, password });
+    await newUser.save();
+
+    res.status(201).json({ message: 'User registered successfully' });
+  } catch (error: any) {
+    console.error('Registration error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Login user
+authRouter.post('/login', async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body as Pick<User, 'email' | 'password'>;
+
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    const isMatch = await user.comparePassword(password as string);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET as string, { expiresIn: '1h' });
+    res.status(200).json({ token, userId: user._id, username: user.username });
+  } catch (error: any) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+export default authRouter;
+
+// routes/userSettings.ts
+import { Router, Request, Response } from 'express';
+import { PortalSettingModel } from '../models/PortalSetting';
+import { authenticateToken } from '../middleware/auth';
+import type { UserPortalSettings } from '../interfaces/portal';
+
+const userSettingsRouter = Router();
+
+interface AuthenticatedRequest extends Request {
+  userId?: string;
+}
+
+// Get user portal settings
+userSettingsRouter.get('/settings', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    let settings = await PortalSettingModel.findOne({ userId });
+    if (!settings) {
+      // If no settings found, create default settings
+      settings = await PortalSettingModel.create({
+        userId,
+        layout: [], // Default empty layout
+        theme: 'light',
+        language: 'en',
+      });
+    }
+
+    res.status(200).json(settings);
+  } catch (error: any) {
+    console.error('Get user settings error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Update user portal settings
+userSettingsRouter.put('/settings', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const updatedSettings = req.body as UserPortalSettings;
+    // Ensure userId in body matches authenticated user for security
+    if (updatedSettings.userId && updatedSettings.userId !== userId) {
+      return res.status(403).json({ message: 'Forbidden: Cannot update settings for another user' });
+    }
+
+    const settings = await PortalSettingModel.findOneAndUpdate(
+      { userId },
+      { $set: updatedSettings },
+      { new: true, upsert: true } // Create if not exists, return updated document
+    );
+
+    res.status(200).json(settings);
+  } catch (error: any) {
+    console.error('Update user settings error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+export default userSettingsRouter;
+
+
+// routes/aiAgent.ts (Example AI Agent route)
+import { Router, Request, Response } from 'express';
+import { authenticateToken } from '../middleware/auth';
+import type { UserPortalSettings } from '../interfaces/portal';
+import { PortalSettingModel } from '../models/PortalSetting';
+// import { OpenAI } from 'openai'; // If using OpenAI directly
+// import { ChatOpenAI } from '@langchain/openai'; // If using LangChain
+
+const aiAgentRouter = Router();
+
+interface AuthenticatedRequest extends Request {
+  userId?: string;
+}
+
+// const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY }); // Initialize OpenAI client
+// const chatModel = new ChatOpenAI({ openAIApiKey: process.env.OPENAI_API_KEY, temperature: 0 }); // Initialize LangChain Chat Model
+
+// Endpoint for AI Agent to process user commands and potentially modify portal settings
+aiAgentRouter.post('/command', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const { command } = req.body as { command: string };
+    if (!command) {
+      return res.status(400).json({ message: 'Command is required' });
+    }
+
+    // --- AI Agent Logic ---
+    // Here, you would integrate with your AI model (e.g., OpenAI, LangChain)
+    // to interpret the 'command' and determine the intended action.
+
+    // Example: Using OpenAI API (simplified, without actual AI logic for brevity)
+    // const completion = await openai.chat.completions.create({
+    //   messages: [{ role: 'user', content: `Analyze this command for portal configuration: "${command}". Suggest changes to layout or theme.` }],
+    //   model: 'gpt-3.5-turbo',
+    // });
+    // const aiResponse = completion.choices[0].message.content;
+
+    // Example: Using LangChain (more structured approach)
+    // const { text: aiResponse } = await chatModel.invoke(command);
+
+    // For demonstration, let's simulate AI parsing the command
+    let aiParsedAction: { type: string; payload?: any } = { type: 'unknown' };
+
+    if (command.toLowerCase().includes('change theme to dark')) {
+      aiParsedAction = { type: 'changeTheme', payload: 'dark' };
+    } else if (command.toLowerCase().includes('add welcome widget')) {
+      aiParsedAction = {
+        type: 'addWidget',
+        payload: {
+          id: `widget-${Date.now()}`,
+          type: 'text',
+          title: 'AI Welcome',
+          position: { x: 50, y: 50, width: 300, height: 150, zIndex: 10 },
+          minimized: false,
+          maximized: false,
+          fullscreen: false,
+          config: { content: 'Welcome by AI Agent!' },
+        },
+      };
+    } else if (command.toLowerCase().includes('make all widgets full screen')) {
+      aiParsedAction = { type: 'setAllFullscreen' };
+    }
+
+    let responseMessage: string = `Command "${command}" processed.`;
+    let updatedSettings: UserPortalSettings | null = null;
+
+    // Apply changes based on AI's parsed action
+    let userSettings = await PortalSettingModel.findOne({ userId });
+    if (!userSettings) {
+        userSettings = await PortalSettingModel.create({ userId, layout: [], theme: 'light', language: 'en' });
+    }
+
+    if (aiParsedAction.type === 'changeTheme' && userSettings) {
+      userSettings.theme = aiParsedAction.payload;
+      await userSettings.save();
+      updatedSettings = userSettings.toObject(); // Convert Mongoose document to plain object
+      responseMessage = `Theme changed to ${aiParsedAction.payload}.`;
+    } else if (aiParsedAction.type === 'addWidget' && userSettings) {
+      userSettings.layout.push(aiParsedAction.payload);
+      await userSettings.save();
+      updatedSettings = userSettings.toObject();
+      responseMessage = `Added a new widget: "${aiParsedAction.payload.title}".`;
+    } else if (aiParsedAction.type === 'setAllFullscreen' && userSettings) {
+        userSettings.layout = userSettings.layout.map(widget => ({
+            ...widget,
+            fullscreen: true,
+            minimized: false,
+            maximized: false,
+        }));
+        await userSettings.save();
+        updatedSettings = userSettings.toObject();
+        responseMessage = `All widgets set to fullscreen.`;
+    }
+    // ... more AI actions to modify layout, content, etc.
+
+    // If settings were updated, notify frontend via WebSocket
+    if (updatedSettings) {
+      req.app.get('io').to(userId).emit('portal-settings-updated', updatedSettings); // Push updates to specific user
+    }
+
+    res.status(200).json({ message: responseMessage, aiResponse: responseMessage, updatedSettings });
+  } catch (error: any) {
+    console.error('AI Agent command error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+export default aiAgentRouter;
+
+// app.ts (Main Express Application)
+import express, { Application, Request, Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+import cors from 'cors';
+import { createServer } from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+
+import authRouter from './routes/auth';
+import userSettingsRouter from './routes/userSettings';
+import aiAgentRouter from './routes/aiAgent';
+// import other routes as needed
+
+dotenv.config();
+
+const app: Application = express();
+const httpServer = createServer(app);
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173', // Your frontend URL
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true,
+  },
+});
+
+const PORT = process.env.PORT || 3000;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ai_agent_portal';
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key'; // Use a strong secret in production
+
+// Connect to MongoDB
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('MongoDB connected successfully'))
+  .catch((err: Error) => console.error('MongoDB connection error:', err));
+
+// Middleware
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true,
+}));
+app.use(express.json()); // For parsing application/json
+
+// Attach Socket.IO to app for use in routes
+app.set('io', io);
+
+// Routes
+app.use('/api/auth', authRouter);
+app.use('/api/user', userSettingsRouter);
+app.use('/api/ai-agent', aiAgentRouter);
+
+app.get('/', (req: Request, res: Response) => {
+  res.send('AI Agent Portal Backend is running!');
+});
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('A user connected:', socket.id);
+
+  // Example: Join a room based on user ID after authentication (sent from frontend)
+  socket.on('join-user-room', (userId: string) => {
+    socket.join(userId);
+    console.log(`Socket ${socket.id} joined room for user ${userId}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
+
+// Error handling middleware (optional, but good practice)
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error(err.stack);
+  res.status(500).send('Something broke!');
+});
+
+httpServer.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+4. 核心功能实现细节
+4.1. 用户认证与授权
+注册: 收集用户名、邮箱和密码。密码使用 bcrypt.js 进行哈希处理后存储。
+登录: 验证用户提供的邮箱和密码。如果凭据有效，生成一个 JWT 并返回给客户端。
+授权: 后端 API 路由使用 authenticateToken 中间件验证传入请求中的 JWT。如果 JWT 有效，将用户 ID 附加到请求对象上，供后续处理使用。
+会话管理: JWT 是无状态的，客户端将 JWT 存储在 localStorage 或 sessionStorage 中，并在每个受保护的请求中作为 Authorization 头部发送。
+4.2. 用户偏好与门户配置管理
+数据模型: PortalSettingModel 存储每个用户的门户布局、主题、语言及其他自定义偏好。layout 字段是一个数组，包含 PortalWidget 接口定义的对象，每个对象描述一个窗口组件及其状态（位置、大小、类型、配置等）。
+API:
+GET /api/user/settings: 获取当前用户的门户设置。如果用户首次登录没有设置，则创建一套默认设置。
+PUT /api/user/settings: 更新当前用户的门户设置。
+实时更新: 当后端通过 AI 代理或其他方式修改了用户的门户设置时，可以通过 Socket.IO 向该用户发送 portal-settings-updated 事件，前端接收后更新界面。
+4.3. AI 代理集成
+AI 代理是 Portal 的核心创新点，它允许用户通过指令操作门户。
+
+交互方式:
+命令输入: 前端提供一个输入框，用户可以输入自然语言命令（例如：“将主题改为深色模式”，“添加一个天气预报小部件”，“最大化所有图表”）。
+后端处理: 后端 aiAgentRouter.post('/command') 接收用户命令。
+AI 模型集成:
+将用户命令发送到 OpenAI GPT 或其他 LLM 进行意图识别和参数提取。
+可以使用 LangChain.js 等框架来构建更复杂的 AI Agent，包括：
+工具 (Tools): 定义 AI Agent 可以执行的特定操作，例如 changeTheme(theme: 'light' | 'dark'), addWidget(widgetConfig: PortalWidget), updateWidgetPosition(widgetId: string, position: object) 等。
+链 (Chains): 组合多个工具或模型调用，形成复杂的工作流。
+记忆 (Memory): 存储会话历史，使 AI Agent 能够理解上下文。
+操作执行: 根据 AI 模型识别出的意图和参数，后端调用相应的服务逻辑来修改数据库中的 PortalSetting。
+反馈与实时更新:
+AI Agent 处理完命令后，将结果（成功/失败消息，或者新的配置）返回给前端。
+如果门户配置发生更改，后端通过 Socket.IO 向受影响的用户发送实时更新，前端立即渲染新的配置。
+4.4. 实时内容自定义与显示
+内容配置: PortalWidget 接口中的 config 字段是一个 Record<string, any>，允许存储不同类型小部件的特定配置，例如：
+文本小部件: { content: 'Hello World' }
+图表小部件: { chartType: 'line', dataUrl: '/api/data/trends' }
+天气小部件: { location: 'New York', units: 'metric' }
+数据源: 后端可以集成各种外部 API 或内部服务来获取实时数据。
+WebSocket 推送:
+后端服务（例如，一个定时任务或一个事件驱动的服务）在检测到数据更新时，通过 Socket.IO 向客户端推送数据。
+客户端根据小部件 ID 和类型，接收并更新相应小部件的内容。
+前端渲染: 前端 PortalWidgetComponent 应该是一个动态组件，根据 widget.type 渲染不同的小部件（例如，TextWidget, ChartWidget, WeatherWidget），并能够响应 Socket.IO 推送的实时数据。
+5. 开发与部署
+5.1. 开发环境
+Node.js: LTS 版本 (例如 20.x)。
+包管理器: pnpm (推荐，性能更优) 或 npm/yarn。
+代码编辑器: VS Code，配合 ESLint, Prettier, Vue Language Features (Volar) 插件。
+版本控制: Git。
+5.2. 代码规范与质量
+ESLint: 配置 ESLint 规则以强制执行代码风格和最佳实践，确保代码一致性。
+Prettier: 自动格式化代码，减少格式争议。
+TypeScript: 利用 TypeScript 的强类型特性，减少运行时错误，提高代码可读性和可维护性。
+5.3. 测试
+单元测试:
+前端: Vitest (与 Vite 紧密集成，快速) 或 Jest。
+后端: Jest。
+端到端 (E2E) 测试: Cypress 或 Playwright，模拟用户在浏览器中的真实交互，测试整个应用流程。
+5.4. 部署
+容器化: 使用 Docker 将前端和后端应用及其依赖打包成独立的容器镜像，实现环境隔离和简化部署。
+编排: 使用 Docker Compose 在单机上管理多个服务（前端、后端、数据库）。对于生产环境，可以考虑 Kubernetes 进行大规模部署。
+CI/CD: 配置 GitHub Actions, GitLab CI/CD 或 Jenkins 等工具，实现代码提交后自动构建、测试和部署。
+反向代理: 使用 Nginx 或 Caddy 作为反向代理，处理 HTTPS、负载均衡、静态文件服务和请求转发到后端服务。
+进程管理: 对于 Node.js 后端，使用 PM2 或 forever 确保应用在生产环境中持续运行并进行故障恢复。
+6. 安全考虑
+HTTPS: 所有通信必须通过 HTTPS 加密，防止数据窃听。
+输入验证: 前后端对所有用户输入进行严格验证，防止 XSS、SQL 注入（虽然我们用 NoSQL，但也要防止注入恶意 JavaScript）和命令注入等攻击。
+跨域资源共享 (CORS): 正确配置 CORS 策略，只允许受信任的前端域访问后端 API。
+CSRF 防护: 对于非 GET 请求，考虑使用 CSRF token 来防止跨站请求伪造攻击。
+XSS 防护: 对用户生成的内容进行清理和转义，防止跨站脚本攻击。
+速率限制: 对认证、注册和 AI Agent 命令等关键 API 实施速率限制，防止暴力破解和拒绝服务攻击。
+敏感信息存储: 环境变量 (.env) 管理 API 密钥、数据库凭据和 JWT 密钥。数据库中密码存储为哈希值。
+依赖项安全: 定期更新所有第三方库到最新版本，并使用 npm audit 或 yarn audit 等工具扫描已知漏洞。
+7. 总结
+通过上述技术栈和架构设计，我们将能够构建一个高性能、可扩展、安全且用户友好的 AI Agent Portal。前端 Vue 3 和 Vuetify 提供了卓越的用户体验，后端 Node.js 和 Express.js 提供了强大的 API 服务能力，而 MongoDB 和 AI Agent 的集成则为用户带来了高度个性化和智能化的门户管理体验。持续集成/部署和严格的安全实践将确保项目的稳定性和可靠性。
