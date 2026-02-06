@@ -1,7 +1,7 @@
 // netlify/functions/user-settings-put.ts
 import type { Handler } from '@netlify/functions';
-import { getSupabaseClient } from '../utils/supabase'; // Import the Supabase client utility
-import { authenticateToken } from '../middleware/auth-function';
+import { getSupabaseClient } from './utils/supabase'; // Import the Supabase client utility
+import { authenticateToken } from './middleware/auth-function';
 import type { UserPortalSettings, PortalWidget } from '../../src/interfaces/portal'; // Ensure interface is accessible
 import 'dotenv/config';
 

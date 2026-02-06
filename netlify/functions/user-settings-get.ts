@@ -1,6 +1,6 @@
 import { Handler, Context } from '@netlify/functions';
-import { getSupabaseClient } from '../utils/supabase';
-import { authenticateToken } from '../middleware/auth-function'; // This middleware still validates the JWT
+import { getSupabaseClient } from './utils/supabase';
+import { authenticateToken } from './middleware/auth-function'; // This middleware still validates the JWT
 import type { UserPortalSettings, PortalWidget } from '../../src/interfaces/portal'; // Ensure interface is accessible
 import 'dotenv/config';
 
