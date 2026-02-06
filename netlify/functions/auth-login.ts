@@ -1,5 +1,5 @@
 import { Handler, Context } from '@netlify/functions';
-import { getSupabaseClient } from '../utils/supabase';
+import { getSupabaseClient } from './utils/supabase';
 import { AuthTokenResponse } from '@supabase/supabase-js'; // Import Supabase Auth types
 import 'dotenv/config';
 
