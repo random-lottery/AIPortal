@@ -16,6 +16,7 @@ backend/dist/
 .netlify/
 
 # Environment & local config
+.env
 .env.*.local
 .DS_Store
 Thumbs.db
