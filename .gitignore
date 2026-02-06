@@ -22,7 +22,7 @@ backend/dist/
 Thumbs.db
 .vscode/
 .idea/
-
+.database
 # Test / coverage
 coverage/
 
