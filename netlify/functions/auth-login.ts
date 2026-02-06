@@ -1,52 +1,53 @@
-import type { Handler } from '@netlify/functions';
-import jwt from 'jsonwebtoken';
-import { connectDB, getRepository } from './utils/database';
-import { UserEntity } from '../../entities/User';
+import { Handler, Context } from '@netlify/functions';
+import { getSupabaseClient } from '../utils/supabase';
+import { AuthTokenResponse } from '@supabase/supabase-js'; // Import Supabase Auth types
 import 'dotenv/config';
 
-const handler: Handler = async (event) => {
+const handler: Handler = async (event, context) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
   try {
-    await connectDB();
+    const supabase = getSupabaseClient();
     const { email, password } = JSON.parse(event.body || '{}');
 
     if (!email || !password) {
+      return { statusCode: 400, body: JSON.stringify({ message: 'Email and password are required' }) };
+    }
+
+    // Use Supabase auth.signInWithPassword to authenticate
+    const { data, error }: AuthTokenResponse = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error('Supabase signInWithPassword error:', error.message);
       return {
         statusCode: 400,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'Email and password are required' }),
+        body: JSON.stringify({ message: error.message || 'Invalid credentials' }),
       };
     }
 
-    const userRepository = getRepository(UserEntity);
-    const user = await userRepository.findOne({ where: { email } });
-
-    if (!user) {
-      return {
-        statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'Invalid credentials' }),
-      };
+    if (!data || !data.user || !data.session) {
+        return {
+            statusCode: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: 'Authentication failed, no user or session data.' }),
+        };
     }
 
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return {
-        statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'Invalid credentials' }),
-      };
-    }
-
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET as string, { expiresIn: '1h' });
+    // Supabase returns a JWT token in the session object
+    const token = data.session.access_token;
+    const userId = data.user.id;
+    const username = data.user.email; // Or fetch from a public_users table if you have usernames
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, userId: user.id, username: user.username }),
+      body: JSON.stringify({ token, userId, username }),
     };
   } catch (error: any) {
     console.error('Login error:', error);
@@ -59,4 +60,3 @@ const handler: Handler = async (event) => {
 };
 
 export { handler };
-
