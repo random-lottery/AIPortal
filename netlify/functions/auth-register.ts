@@ -1,7 +1,8 @@
 // netlify/functions/auth-register.ts
 import type { Handler } from '@netlify/functions';
-import { getSupabaseClient } from './utils/supabase'; // Import the Supabase client utility
-import { SignUpResponse } from '@supabase/supabase-js'; // Import Supabase Auth types
+import { getSupabaseClient } from './utils/supabase';
+// 修正：使用 AuthResponse 类型
+import { AuthResponse } from '@supabase/supabase-js'; // Changed from SignUpResponse
 import 'dotenv/config';
 
 const handler: Handler = async (event) => {
@@ -11,11 +12,9 @@ const handler: Handler = async (event) => {
 
   try {
     const supabase = getSupabaseClient();
-    const { email, password, username } = JSON.parse(event.body || '{}'); // Assuming username is also sent
+    const { email, password, username } = JSON.parse(event.body || '{}');
 
     if (!email || !password) {
-      // Username is optional for Supabase auth.signUp, but you might want to enforce it for your app.
-      // If enforcing, uncomment and adjust: if (!username || !email || !password) { ... }
       return {
         statusCode: 400,
         headers: { 'Content-Type': 'application/json' },
@@ -23,17 +22,13 @@ const handler: Handler = async (event) => {
       };
     }
 
-    // Use Supabase auth.signUp to register a new user
-    // You can optionally pass 'data' for user metadata, like a username
-    const { data, error }: SignUpResponse = await supabase.auth.signUp({
+    const { data, error }: AuthResponse = await supabase.auth.signUp({ // Changed type here
       email,
       password,
       options: {
         data: {
-          username: username, // Store username as user metadata
+          username: username,
         },
-        // If you require email confirmation, you might also set redirectTo
-        // redirectTo: 'http://localhost:8888/.netlify/functions/auth-callback', // Example for email confirmation flow
       },
     });
 
@@ -46,10 +41,8 @@ const handler: Handler = async (event) => {
       };
     }
 
-    // After successful registration, Supabase might automatically sign in the user
-    // or require email confirmation depending on your Supabase project settings.
-    // The `data.user` and `data.session` will be available if signed in directly.
-
+    // data 结构现在可能包含 user 和 session
+    // 在 Supabase 的最新版本中，signUp 成功后，data.user 会有值，data.session 则取决于是否自动登录
     if (data.user && data.session) {
         // User was automatically signed in after registration (common in development settings)
         return {
@@ -59,22 +52,24 @@ const handler: Handler = async (event) => {
                 message: 'User registered and logged in successfully',
                 userId: data.user.id,
                 token: data.session.access_token,
-                username: (data.user.user_metadata as any)?.username || data.user.email, // Access username from metadata
+                username: (data.user.user_metadata as { username?: string })?.username || data.user.email, // Access username from metadata
             }),
         };
     } else if (data.user && !data.session) {
         // User registered but requires email confirmation (common in production settings)
+        // In this case, data.session will be null.
         return {
-            statusCode: 200, // Not 201, as user is not fully active yet
+            statusCode: 200,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: 'Registration successful, please check your email for verification.' }),
         };
     } else {
-        // Unexpected scenario
+        // This case should ideally not happen if data.user is null but no error,
+        // but it's good for robustness.
         return {
             statusCode: 500,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: 'Registration process had an unexpected outcome.' }),
+            body: JSON.stringify({ message: 'Registration process had an unexpected outcome (no user data).' }),
         };
     }
 

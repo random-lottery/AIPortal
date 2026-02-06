@@ -14,9 +14,11 @@
   "type": "commonjs",
   "dependencies": {
     "@netlify/functions": "^5.1.2",
+    "@supabase/supabase-js": "^2.95.3",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.3",
     "jsonwebtoken": "^9.0.3",
+    "openai": "^6.18.0",
     "pg": "^8.18.0",
     "reflect-metadata": "^0.2.2",
     "typeorm": "^0.3.28"
