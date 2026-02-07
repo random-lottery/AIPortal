@@ -11,7 +11,7 @@ export const getSupabaseClient = (): SupabaseClient => {
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY; // <<< IMPORTANT: Use SERVICE_KEY here for backend functions!
-
+  console.log("SUPABASE_URL",supabaseUrl,"SUPABASE_SERVICE_KEY",supabaseKey);
   if (!supabaseUrl || !supabaseKey) {
     throw new Error('Supabase URL and/or SERVICE_KEY are not defined in environment variables.');
   }
