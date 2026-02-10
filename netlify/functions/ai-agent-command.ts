@@ -123,7 +123,7 @@ const handler: Handler = async (event) => {
         { role: 'system', content: systemPrompt },
         { role: 'user', content: command },
       ],
-      model: 'gpt-3.5-turbo', // Or 'gpt-4' for more advanced reasoning
+      model: 'glm-4.5-air:free', // Or 'gpt-4' for more advanced reasoning
       response_format: { type: 'json_object' }, // Crucial for getting structured JSON output
     });
 
