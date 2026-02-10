@@ -6,6 +6,7 @@ import type { PortalWidget, UserPortalSettings } from '../../src/interfaces/port
 import 'dotenv/config';
 import OpenAI from 'openai'; // Import OpenAI SDK
 
+console.log('OPENAI_API_KEY loaded:', process.env.OPENAI_API_KEY ? 'Yes' : 'No');
 // Initialize OpenAI client
 const openai = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
