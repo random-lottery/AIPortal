@@ -23,7 +23,7 @@
       "dest": "frontend/dist/index.html"
     }
   ],
-  "installCommand": "pnpm install", // <-- 确保安装命令在根目录执行
-  "buildCommand": "cd frontend && pnpm run build --output public", // <-- 在 frontend 目录中执行构建
+  //"installCommand": "pnpm install", // <-- 确保安装命令在根目录执行
+  //"buildCommand": "cd frontend && pnpm run build --output public", // <-- 在 frontend 目录中执行构建
   "outputDirectory": "frontend/public" // <-- 输出目录现在是 frontend/dist
 }
