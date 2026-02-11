@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import mongoose from 'mongoose';
+import { createClient } from '@supabase/supabase-js';
 import { createApp } from './app';
 
 // 创建一个Express应用实例
@@ -9,11 +9,18 @@ const app = express();
 // 连接数据库
 const connectDatabase = async (): Promise<void> => {
   try {
-    const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/ai_agent_portal';
-    await mongoose.connect(uri);
-    console.log('MongoDB connected');
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be defined in environment variables');
+    }
+    
+    // Create Supabase client
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log('SUPABASE connected');
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    console.error('SUPABASE connection error:', error);
   }
 };
 

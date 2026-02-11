@@ -1,9 +1,9 @@
 import express, { Application } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import mongoose from 'mongoose';
 import { createServer, Server as HTTPServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
+import { createClient } from '@supabase/supabase-js';
 
 import authRouter from './routes/auth';
 import userSettingsRouter from './routes/userSettings';
@@ -12,9 +12,16 @@ import aiAgentRouter from './routes/aiAgent';
 dotenv.config();
 
 export const connectDatabase = async (): Promise<void> => {
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/ai_agent_portal';
-  await mongoose.connect(uri);
-  console.log('MongoDB connected');
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be defined in environment variables');
+  }
+  
+  // Create Supabase client
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  console.log('SUPABASE connected');
 };
 
 export const createApp = (): { app: Application; httpServer: HTTPServer; io: SocketIOServer } => {

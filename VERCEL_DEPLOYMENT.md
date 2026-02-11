@@ -36,7 +36,8 @@ vercel --prod
 在Vercel项目设置中添加以下环境变量：
 
 ### 数据库相关
-- `MONGODB_URI` - MongoDB连接字符串
+- `SUPABASE_URL` - Supabase项目URL
+- `SUPABASE_SERVICE_KEY` - Supabase服务密钥
 
 ### 认证相关
 - `JWT_SECRET` - JWT密钥
