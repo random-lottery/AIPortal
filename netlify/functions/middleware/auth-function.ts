@@ -30,7 +30,7 @@ export const authenticateToken = (event: APIGatewayProxyEvent): AuthResult => {
     const decoded = jwt.verify(token, supabaseJwtSecret, { algorithms: ['HS256'] }) as { sub: string; iat: number; exp: number };
     return { isAuthenticated: true, statusCode: 200, userId: decoded.sub };
   } catch (err: any) { // Cast err to any to access message property safely
-    console.error('Token verification error:', err.message); // Log the specific error message
+    console.error('Token verification error:', err.message, supabaseJwtSecret, token); // Log the specific error message
     // 针对 invalid algorithm 错误，给出更明确的提示
     if (err.name === 'JsonWebTokenError' && err.message === 'invalid algorithm') {
       return { isAuthenticated: false, statusCode: 403, message: 'Forbidden: Invalid token signature or algorithm mismatch.' };
