@@ -9,9 +9,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build --output public",
+    "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
-    "vercel-build": "npm run build"
+    "vercel-build": "npm run build --output public"
   },
   "dependencies": {
     "axios": "^1.13.4",
