@@ -6,6 +6,7 @@
   "scripts": {
     "build:functions": "tsc -p tsconfig.json",
     "dev:functions": "netlify dev",
+    "vercel-build": "cd frontend && npm install && npm run build",
     "test": "echo \"No tests configured\""
   },
   "keywords": [],
