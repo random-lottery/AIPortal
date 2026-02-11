@@ -9,7 +9,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "build": "vue-tsc -b && vite build --output public",
     "preview": "vite preview",
     "vercel-build": "npm run build"
   },
