@@ -1,5 +1,6 @@
 // netlify/functions/middleware/auth-function.ts
 import { APIGatewayProxyEvent } from 'aws-lambda';
+import { getSupabaseClient } from '../utils/supabase';
 import jwt from 'jsonwebtoken';
 import 'dotenv/config';
 
