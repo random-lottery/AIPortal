@@ -16,7 +16,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "backend/src/vercel-app.ts"
+      "dest": "backend/dist/vercel-app.ts"
     },
     {
       "src": "/(.*)",

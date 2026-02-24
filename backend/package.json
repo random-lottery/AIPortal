@@ -4,7 +4,7 @@
   "description": "AI Agent Portal backend (Express + Mongo + Socket.IO)",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev": "ts-node-dev --respawn --transpile-only  --cjs src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "lint": "echo \"Add ESLint if needed\""

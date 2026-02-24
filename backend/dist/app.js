@@ -7,17 +7,22 @@ exports.createApp = exports.connectDatabase = void 0;
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
-const mongoose_1 = __importDefault(require("mongoose"));
 const http_1 = require("http");
 const socket_io_1 = require("socket.io");
+const supabase_js_1 = require("@supabase/supabase-js");
 const auth_1 = __importDefault(require("./routes/auth"));
 const userSettings_1 = __importDefault(require("./routes/userSettings"));
 const aiAgent_1 = __importDefault(require("./routes/aiAgent"));
 dotenv_1.default.config();
 const connectDatabase = async () => {
-    const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/ai_agent_portal';
-    await mongoose_1.default.connect(uri);
-    console.log('MongoDB connected');
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+        throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be defined in environment variables');
+    }
+    // Create Supabase client
+    const supabase = (0, supabase_js_1.createClient)(supabaseUrl, supabaseKey);
+    console.log('SUPABASE connected');
 };
 exports.connectDatabase = connectDatabase;
 const createApp = () => {

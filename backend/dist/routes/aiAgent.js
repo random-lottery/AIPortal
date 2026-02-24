@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
-const PortalSetting_1 = require("../models/PortalSetting");
+const supabase_1 = require("../utils/supabase");
 const aiAgentRouter = (0, express_1.Router)();
 aiAgentRouter.post('/command', auth_1.authenticateToken, async (req, res) => {
     try {
@@ -16,6 +16,7 @@ aiAgentRouter.post('/command', auth_1.authenticateToken, async (req, res) => {
             res.status(400).json({ message: 'Command is required' });
             return;
         }
+        const supabase = (0, supabase_1.getSupabaseClient)();
         // Simulated AI parsing logic. Replace with real LLM calls (OpenAI/LangChain).
         let aiParsedAction = { type: 'unknown' };
         const lower = command.toLowerCase();
@@ -45,31 +46,92 @@ aiAgentRouter.post('/command', auth_1.authenticateToken, async (req, res) => {
         }
         let responseMessage = `Command "${command}" processed.`;
         let updatedSettings = null;
-        let userSettings = await PortalSetting_1.PortalSettingModel.findOne({ userId });
-        if (!userSettings) {
-            userSettings = await PortalSetting_1.PortalSettingModel.create({ userId, layout: [], theme: 'light', language: 'en' });
+        // Get user settings
+        let { data: userSettings, error: fetchError } = await supabase
+            .from('portal_settings')
+            .select('*')
+            .eq('userId', userId)
+            .limit(1)
+            .single();
+        // If no settings found, create default settings
+        if (fetchError || !userSettings) {
+            const { data: newSettings, error: insertError } = await supabase
+                .from('portal_settings')
+                .insert([
+                {
+                    userId,
+                    layout: [],
+                    theme: 'light',
+                    language: 'en',
+                }
+            ])
+                .select()
+                .single();
+            if (insertError) {
+                console.error('Error creating default settings:', insertError);
+                res.status(500).json({ message: 'Internal server error' });
+                return;
+            }
+            userSettings = newSettings;
         }
+        // Process AI action
         if (aiParsedAction.type === 'changeTheme') {
-            userSettings.theme = aiParsedAction.payload;
-            await userSettings.save();
-            updatedSettings = userSettings.toObject();
+            const { data, error } = await supabase
+                .from('portal_settings')
+                .update({ theme: aiParsedAction.payload })
+                .eq('userId', userId)
+                .select()
+                .single();
+            if (error) {
+                console.error('Error updating theme:', error);
+                res.status(500).json({ message: 'Internal server error' });
+                return;
+            }
+            updatedSettings = data;
             responseMessage = `Theme changed to ${aiParsedAction.payload}.`;
         }
         else if (aiParsedAction.type === 'addWidget') {
-            userSettings.layout.push(aiParsedAction.payload);
-            await userSettings.save();
-            updatedSettings = userSettings.toObject();
+            // Add new widget to layout
+            const updatedLayout = [...userSettings.layout, aiParsedAction.payload];
+            const { data, error } = await supabase
+                .from('portal_settings')
+                .update({ layout: updatedLayout })
+                .eq('userId', userId)
+                .select()
+                .single();
+            if (error) {
+                console.error('Error adding widget:', error);
+                res.status(500).json({ message: 'Internal server error' });
+                return;
+            }
+            updatedSettings = data;
             responseMessage = `Added widget "${aiParsedAction.payload.title}".`;
         }
         else if (aiParsedAction.type === 'setAllFullscreen') {
-            userSettings.layout.forEach((widget) => {
-                widget.fullscreen = true;
-                widget.maximized = false;
-                widget.minimized = false;
-            });
-            await userSettings.save();
-            updatedSettings = userSettings.toObject();
+            // Set all widgets to fullscreen
+            const updatedLayout = userSettings.layout.map((widget) => ({
+                ...widget,
+                fullscreen: true,
+                maximized: false,
+                minimized: false,
+            }));
+            const { data, error } = await supabase
+                .from('portal_settings')
+                .update({ layout: updatedLayout })
+                .eq('userId', userId)
+                .select()
+                .single();
+            if (error) {
+                console.error('Error setting all widgets fullscreen:', error);
+                res.status(500).json({ message: 'Internal server error' });
+                return;
+            }
+            updatedSettings = data;
             responseMessage = 'All widgets set to fullscreen.';
+        }
+        else {
+            // No action taken, return current settings
+            updatedSettings = userSettings;
         }
         if (updatedSettings) {
             const io = req.app.get('io');
