@@ -19,3 +19,12 @@ export interface UserPortalSettings {
   updatedAt?: Date;
 }
 
+export interface UserPortalSettingsUI {
+  id?: string;
+  userId: string;
+  layout: PortalWidget[];
+  theme: string;
+  language: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}

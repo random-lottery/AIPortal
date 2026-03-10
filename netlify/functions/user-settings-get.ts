@@ -63,7 +63,7 @@ const handler: Handler = async (event, context) => { // Removed duplicate Handle
     }
 
     // Map Supabase column names to your frontend interface (user_id -> userId)
-    const formattedSettings: UserPortalSettings = {
+    const formattedSettings: UserPortalSettingsUI = {
       id: settings.id,
       userId: settings.user_id, // <<< 修正点：从 user_id 映射回 userId
       layout: settings.layout as PortalWidget[],
