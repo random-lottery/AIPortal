@@ -10,7 +10,7 @@ const handler: Handler = async (event) => {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
-  const authResult = authenticateToken(event);
+  const authResult = await authenticateToken(event);
   if (!authResult.isAuthenticated) {
     return {
       statusCode: authResult.statusCode,

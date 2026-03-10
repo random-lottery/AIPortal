@@ -11,7 +11,7 @@ export interface PortalWidget {
 
 export interface UserPortalSettings {
   id?: string;
-  userId: string;
+  user_id: string;
   layout: PortalWidget[];
   theme: string;
   language: string;

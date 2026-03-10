@@ -43,7 +43,9 @@ const handler: Handler = async (event, context) => {
     const token = data.session.access_token;
     const userId = data.user.id;
     const username = data.user.email; // Or fetch from a public_users table if you have usernames
-
+    console.log('token', token);
+    console.log('userId', userId);
+    console.log('username', username);
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },

@@ -11,7 +11,7 @@ interface AuthResult {
   userId?: string;
 }
 
-export const authenticateToken = (event: APIGatewayProxyEvent): AuthResult => {
+export const authenticateToken = async (event: APIGatewayProxyEvent): Promise<AuthResult> => {
   const authHeader = event.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1];
 
