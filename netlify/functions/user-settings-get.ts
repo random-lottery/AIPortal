@@ -3,7 +3,7 @@
 import type { Handler, Context } from '@netlify/functions';
 import { getSupabaseClient } from './utils/supabase';
 import { authenticateToken } from './middleware/auth-function';
-import type { UserPortalSettings, PortalWidget } from '../../src/interfaces/portal';
+import type { UserPortalSettings, PortalWidget, UserPortalSettingsDB } from '../../src/interfaces/portal';
 import 'dotenv/config';
 
 const handler: Handler = async (event, context) => { // Removed duplicate Handler =
@@ -63,7 +63,7 @@ const handler: Handler = async (event, context) => { // Removed duplicate Handle
     }
 
     // Map Supabase column names to your frontend interface (user_id -> userId)
-    const formattedSettings: UserPortalSettingsUI = {
+    const formattedSettings: UserPortalSettings = {
       id: settings.id,
       userId: settings.user_id, // <<< 修正点：从 user_id 映射回 userId
       layout: settings.layout as PortalWidget[],

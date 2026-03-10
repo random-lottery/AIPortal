@@ -2,7 +2,7 @@
 import type { Handler } from '@netlify/functions';
 import { getSupabaseClient } from './utils/supabase'; // Import the Supabase client utility
 import { authenticateToken } from './middleware/auth-function';
-import type { UserPortalSettings, PortalWidget, UserPortalSettingsUI } from '../../src/interfaces/portal'; // Ensure interface is accessible
+import type { UserPortalSettings, PortalWidget, UserPortalSettingsDB } from '../../src/interfaces/portal'; // Ensure interface is accessible
 import 'dotenv/config';
 
 const handler: Handler = async (event) => {
@@ -63,7 +63,7 @@ const handler: Handler = async (event) => {
     }
 
     // Map Supabase column names back to your frontend interface if needed
-    const formattedSettings: UserPortalSettingsUI = {
+    const formattedSettings: UserPortalSettings = {
       id: updatedSettings.id,
       userId: updatedSettings.user_id,
       layout: updatedSettings.layout as PortalWidget[],

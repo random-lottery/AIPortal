@@ -2,7 +2,7 @@
 import type { Handler } from '@netlify/functions';
 import { getSupabaseClient } from './utils/supabase'; // Import the Supabase client utility
 import { authenticateToken } from './middleware/auth-function';
-import type { PortalWidget, UserPortalSettings } from '../../src/interfaces/portal'; // Ensure interface is accessible
+import type { PortalWidget, UserPortalSettings, UserPortalSettingsDB } from '../../src/interfaces/portal'; // Ensure interface is accessible
 import 'dotenv/config';
 import OpenAI from 'openai'; // Import OpenAI SDK
 
@@ -62,7 +62,7 @@ const handler: Handler = async (event) => {
 
     if (!settings) {
         // If no settings found, create a default one to work with
-        const defaultSettings: Omit<UserPortalSettings, 'id' | 'createdAt' | 'updatedAt'> = {
+        const defaultSettings: Omit<UserPortalSettingsDB, 'id' | 'createdAt' | 'updatedAt'> = {
             user_id: userId,
             layout: [],
             theme: 'light',
@@ -88,7 +88,7 @@ const handler: Handler = async (event) => {
     // Map Supabase data to local UserPortalSettings interface for easier manipulation
     let currentPortalSettings: UserPortalSettings = {
         id: settings.id,
-        user_id: settings.user_id,
+        userId: settings.user_id,
         layout: settings.layout as PortalWidget[], // Ensure proper type for layout
         theme: settings.theme,
         language: settings.language,
@@ -218,7 +218,7 @@ const handler: Handler = async (event) => {
         // Format the saved data back to UserPortalSettings interface
         savedSettings = {
             id: updated.id,
-            user_id: updated.user_id,
+            userId: updated.user_id,
             layout: updated.layout as PortalWidget[],
             theme: updated.theme,
             language: updated.language,
